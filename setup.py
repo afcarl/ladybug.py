@@ -23,7 +23,7 @@ setup(
         "Development Status :: 4 - Beta",
         "Topic :: Utilities",
         'Environment :: Console',
-        'License :: OSI Approved :: GNU General Public License v3'
+        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)'
     ],
 )
 
