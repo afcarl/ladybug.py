@@ -58,6 +58,14 @@ class Employee(Table):
     def annual_salary(weeks, salary):
         return weeks * salary
 
+    @field(column="max_salary")
+    def max_annual_salary(wage, hours):
+        return hours * 50 * wage
+
+    @field(column="diff")
+    def difference(annual_salary, max_annual_salary):
+        return annual_salary - max_annual_salary
+
 
 employees = Employee.create()
 employees.append_rows([
@@ -66,4 +74,5 @@ employees.append_rows([
     {"name": "Roland", "hours": 35, "salary": 500, "weeks": 45},
 ], name="name", hours="hours", salary="salary", weeks="weeks")
 print employees.group_by("name", key="wage")
-print list(employees.filter(name="Joe").rows)
+print list(employees.rows)
+print list(employees.filter(max_annual_salary=24500).rows)

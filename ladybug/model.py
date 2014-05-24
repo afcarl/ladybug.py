@@ -17,6 +17,7 @@
 from csv import DictReader, DictWriter
 import itertools
 from inspect import getargspec
+from graph_utils import evaluation_order
 
 
 def cmp_to_key(mycmp):
@@ -81,7 +82,7 @@ class Table(object):
     @property
     def dynamic_fields(self):
         return (
-            name
+            (name, self.get_field(name)[1],)
             for name in dir(self)
             if isinstance(getattr(self, name), DynamicField)
         )
@@ -90,10 +91,25 @@ class Table(object):
     def get_field(self, name):
         return (name, getattr(self, name))
 
+    def get_field_of_column(self, name):
+        for name, field in self.fields:
+            if field.column == name:
+                return field
+        else:
+            return None
+
     def initalize_fields(self):
         for name, member in self.fields:
             if member.column is None:
                 member.column = name
+
+        graph = dict()
+        graph.update({name: [] for name, _ in self.__static_fields})
+        graph.update({
+            name: list(field.depends)
+            for name, field in self.dynamic_fields
+        })
+        self.order_of_evaluation = list(evaluation_order(graph.keys(), graph))
 
     @classmethod
     def manager(cls):
@@ -234,14 +250,15 @@ class Manager(object):
     def rows(self):
         for i in self._include:
             row = dict(self._data[i].iteritems())
-            for name in self.model.dynamic_fields:
+            left = (name for name in self.model.order_of_evaluation if name not in row.keys())
+            for name in left:
                 field = self.model.get_field(name)[1]
                 kwargs = {
                     name: value for name, value in row.iteritems()
                     if name in field.depends
                 }
                 value = field(**kwargs)
-                row.update({field.column: value})
+                row.update({name: value})
             yield row
 
     @property
