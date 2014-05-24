@@ -54,15 +54,15 @@ class Employee(Table):
     def wage(hours, salary):
         return salary / hours
 
-    @field(column="annual")
+    @field
     def annual_salary(weeks, salary):
         return weeks * salary
 
-    @field(column="max_salary")
+    @field
     def max_annual_salary(wage, hours):
         return hours * 50 * wage
 
-    @field(column="diff")
+    @field
     def difference(annual_salary, max_annual_salary):
         return annual_salary - max_annual_salary
 
@@ -76,3 +76,4 @@ employees.append_rows([
 print employees.group_by("name", key="wage")
 print list(employees.rows)
 print list(employees.filter(max_annual_salary=24500).rows)
+print list(employees.group_by("difference"))

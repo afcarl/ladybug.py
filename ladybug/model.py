@@ -249,17 +249,20 @@ class Manager(object):
     @property
     def rows(self):
         for i in self._include:
-            row = dict(self._data[i].iteritems())
-            left = (name for name in self.model.order_of_evaluation if name not in row.keys())
-            for name in left:
-                field = self.model.get_field(name)[1]
-                kwargs = {
-                    name: value for name, value in row.iteritems()
-                    if name in field.depends
-                }
-                value = field(**kwargs)
-                row.update({name: value})
-            yield row
+            yield self.eval_row(i)
+
+    def eval_row(self, i):
+        row = dict(self._data[i].iteritems())
+        left = (name for name in self.model.order_of_evaluation if name not in row.keys())
+        for name in left:
+            field = self.model.get_field(name)[1]
+            kwargs = {
+                name: value for name, value in row.iteritems()
+                if name in field.depends
+            }
+            value = field(**kwargs)
+            row.update({name: value})
+        return row
 
     @property
     def copy(self):
@@ -302,7 +305,7 @@ class Manager(object):
         new_include = list()
         for index in self._include:
             if all(
-                self._data[index][name] == value
+                self.eval_row(index)[name] == value
                 for name, value in kwargs.iteritems()
             ):
                 new_include.append(index)
