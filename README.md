@@ -125,9 +125,3 @@ The following example shows how to convert a CSV file to another dialect using l
 ```python
 ExampleTable.open("example.csv", delimiter=",").save("example_output.csv", delimiter=";")
 ```
-
-## TODO
-* Add support for virtual fields (that calculate node degrees based on other fields for example)
-* Allow data to be easily moved from one Table (or other similar data structure) from another easily. This could be done with export and import methods.
-* Add unit tests
-* Have a method that evaluates virtual fields based on a given query
