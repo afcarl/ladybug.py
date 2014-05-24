@@ -49,9 +49,17 @@ def cmp_to_key(mycmp):
 class Table(object):
     """A model for handling a CSV file"""
     columns = None
+    instances = {}
+
+    @classmethod
+    def getinstance(cls):
+        if cls not in cls.instances:
+            cls.instances[cls] = cls()
+        return cls.instances[cls]
 
     def __init__(self):
         super(Table, self).__init__()
+        self.__result_class = None
         self.initalize_fields()
         if self.columns is None:
             self.columns = list(sorted(
@@ -129,13 +137,16 @@ class Table(object):
 
     @property
     def result_class(self):
+        if self.__result_class:
+            return self.__result_class
         other_class = self.__class__
 
         class result_class(dict):
+
             def __init__(self, row):
                 super(result_class, self).__init__()
+                other = other_class.getinstance()
                 self.row = row
-                other = other_class()
                 for name in other.static_columns:
                     value = row[name]
                     self.update({name: other.get_field(name)[1](value)})
@@ -144,6 +155,7 @@ class Table(object):
                 return dict(self.iteritems())
 
         result_class.__name__ = self.__class__.__name__ + "Object"
+        self.__result_class = result_class
         return result_class
 
 
@@ -208,7 +220,7 @@ class Manager(object):
     """A manager for an opened CSV file based on a Table"""
     def __init__(self, model, data=None, include=None):
         super(Manager, self).__init__()
-        self.model = model()
+        self.model = model.getinstance()
         self._data = data
         if include is not None:
             self._include = include
