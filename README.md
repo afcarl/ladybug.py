@@ -8,6 +8,8 @@ ladybug.py handles CSV files through table models. You need to define a table mo
 
 An example
 ```python
+from ladybug.model import Table, Field, field
+
 class ExampleTable(Table):
     name = Field()
     salary = Field(format=int)
