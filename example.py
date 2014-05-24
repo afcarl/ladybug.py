@@ -1,10 +1,14 @@
-from ladybug.model import Table, Field
+from ladybug.model import Table, Field, field
 
 
 class ExampleTable(Table):
     name = Field()
     salary = Field(format=int)
     department = Field()
+
+    @field
+    def name_length(name):
+        return len(name)
 
 table = ExampleTable.open("example.csv")
 print table.group_by("department")
@@ -40,3 +44,39 @@ table.append_rows(
 print table.group_by("department", key="name")
 
 print list(table.export_rows(first_name="name", dept="department"))
+print table.group_by("name_length", key="name")
+
+
+class Employee(Table):
+    name = Field()
+    hours = Field(format=int)  # hours a week
+    salary = Field(format=int)  # weekly salary
+    weeks = Field(format=int)  # weeks a year
+
+    @field
+    def wage(hours, salary):
+        return salary / hours
+
+    @field
+    def annual_salary(weeks, salary):
+        return weeks * salary
+
+    @field
+    def max_annual_salary(wage, hours):
+        return hours * 50 * wage
+
+    @field
+    def difference(annual_salary, max_annual_salary):
+        return annual_salary - max_annual_salary
+
+
+employees = Employee.create()
+employees.append_rows([
+    {"name": "Bob", "hours": 40, "salary": 700, "weeks": 30},
+    {"name": "Joe", "hours": 30, "salary": 700, "weeks": 45},
+    {"name": "Roland", "hours": 35, "salary": 500, "weeks": 45},
+], name="name", hours="hours", salary="salary", weeks="weeks")
+print employees.group_by("name", key="wage")
+print list(employees.rows)
+print list(employees.filter(max_annual_salary=24500).rows)
+print list(employees.group_by("difference"))

@@ -16,6 +16,8 @@
 
 from csv import DictReader, DictWriter
 import itertools
+from inspect import getargspec
+from graph_utils import evaluation_order
 
 
 def cmp_to_key(mycmp):
@@ -47,32 +49,75 @@ def cmp_to_key(mycmp):
 class Table(object):
     """A model for handling a CSV file"""
     columns = None
+    instances = {}
+
+    @classmethod
+    def getinstance(cls):
+        if cls not in cls.instances:
+            cls.instances[cls] = cls()
+        return cls.instances[cls]
 
     def __init__(self):
         super(Table, self).__init__()
+        self.__result_class = None
         self.initalize_fields()
         if self.columns is None:
             self.columns = list(sorted(
                 (name for name, _ in self.fields),
                 key=lambda f: self.get_field(f)[1].field_order_id
             ))
+        self.static_columns = list(sorted(
+            (name for name, _ in self.__static_fields),
+            key=lambda f: self.get_field(f)[1].field_order_id
+        ))
 
     @property
     def fields(self):
         return (
             self.get_field(name)
             for name in dir(self)
-            if isinstance(getattr(self, name), Field)
+            if isinstance(getattr(self, name), BaseField)
+        )
+
+    @property
+    def __static_fields(self):
+        return (
+            self.get_field(name)
+            for name in dir(self)
+            if isinstance(getattr(self, name), StaticField)
+        )
+
+    @property
+    def dynamic_fields(self):
+        return (
+            (name, self.get_field(name)[1],)
+            for name in dir(self)
+            if isinstance(getattr(self, name), DynamicField)
         )
 
     @classmethod
     def get_field(self, name):
         return (name, getattr(self, name))
 
+    def get_field_of_column(self, name):
+        for name, field in self.fields:
+            if field.column == name:
+                return field
+        else:
+            return None
+
     def initalize_fields(self):
         for name, member in self.fields:
             if member.column is None:
                 member.column = name
+
+        graph = dict()
+        graph.update({name: [] for name, _ in self.__static_fields})
+        graph.update({
+            name: list(field.depends)
+            for name, field in self.dynamic_fields
+        })
+        self.order_of_evaluation = list(evaluation_order(graph.keys(), graph))
 
     @classmethod
     def manager(cls):
@@ -92,14 +137,17 @@ class Table(object):
 
     @property
     def result_class(self):
+        if self.__result_class:
+            return self.__result_class
         other_class = self.__class__
 
         class result_class(dict):
+
             def __init__(self, row):
                 super(result_class, self).__init__()
+                other = other_class.getinstance()
                 self.row = row
-                other = other_class()
-                for name in other.columns:
+                for name in other.static_columns:
                     value = row[name]
                     self.update({name: other.get_field(name)[1](value)})
 
@@ -107,6 +155,7 @@ class Table(object):
                 return dict(self.iteritems())
 
         result_class.__name__ = self.__class__.__name__ + "Object"
+        self.__result_class = result_class
         return result_class
 
 
@@ -119,10 +168,35 @@ class BaseField(object):
         self.field_order_id = self._counter.next()
 
 
-class Field(BaseField):
+def Field(**kwargs):
+    if "format" in kwargs:
+        return StaticField(**kwargs)
+    elif "function" in kwargs:
+        return DynamicField(**kwargs)
+    elif not kwargs:
+        return StaticField()
+    else:
+        raise ValueError("A format or a function is required")
+
+
+def field(*args, **kwargs):
+    if len(args) == 1 and not kwargs:
+        return Field(function=args[0], depends=getargspec(args[0]).args)
+    elif kwargs.keys() == ["column"] and not args:
+        column = kwargs["column"]
+
+        def decorator(func):
+            args = getargspec(func).args
+            return Field(function=func, depends=args, column=column)
+        return decorator
+    else:
+        raise ValueError()
+
+
+class StaticField(BaseField):
     """A field that's mapped to a column of a CSV file"""
     def __init__(self, format=str, column=None):
-        super(Field, self).__init__()
+        super(StaticField, self).__init__()
         self.format = format
         self.column = column
 
@@ -130,11 +204,23 @@ class Field(BaseField):
         return self.format(value)
 
 
+class DynamicField(BaseField):
+    """A field with a value calculated on the fly"""
+    def __init__(self, function, column=None, depends=None):
+        super(DynamicField, self).__init__()
+        self.function = function
+        self.column = column
+        self.depends = depends if depends is not None else list()
+
+    def __call__(self, **kwargs):
+        return self.function(**kwargs)
+
+
 class Manager(object):
     """A manager for an opened CSV file based on a Table"""
     def __init__(self, model, data=None, include=None):
         super(Manager, self).__init__()
-        self.model = model()
+        self.model = model.getinstance()
         self._data = data
         if include is not None:
             self._include = include
@@ -153,6 +239,10 @@ class Manager(object):
     def append_rows(self, source, **kwargs):
         """Append rows from a data source"""
         index = len(self._include)
+        if not self._data:
+            self._data = list()
+        if not self._include:
+            self._include = list()
         for source_row in source:
             row = dict()
             for field, source_field in kwargs.iteritems():
@@ -170,7 +260,21 @@ class Manager(object):
 
     @property
     def rows(self):
-        return (self._data[i] for i in self._include)
+        for i in self._include:
+            yield self.eval_row(i)
+
+    def eval_row(self, i):
+        row = dict(self._data[i].iteritems())
+        left = (name for name in self.model.order_of_evaluation if name not in row.keys())
+        for name in left:
+            field = self.model.get_field(name)[1]
+            kwargs = {
+                name: value for name, value in row.iteritems()
+                if name in field.depends
+            }
+            value = field(**kwargs)
+            row.update({name: value})
+        return row
 
     @property
     def copy(self):
@@ -213,7 +317,7 @@ class Manager(object):
         new_include = list()
         for index in self._include:
             if all(
-                self._data[index][name] == value
+                self.eval_row(index)[name] == value
                 for name, value in kwargs.iteritems()
             ):
                 new_include.append(index)
