@@ -12,6 +12,10 @@ class ExampleTable(Table):
     name = Field()
     salary = Field(format=int)
     department = Field()
+
+    @field
+    def name_length(name):
+        return len(name)
 ```
     
 ## Table managers

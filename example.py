@@ -5,7 +5,10 @@ class ExampleTable(Table):
     name = Field()
     salary = Field(format=int)
     department = Field()
-    name_length = Field(function=lambda name: len(name), depends=["name"])
+
+    @field
+    def name_length(name):
+        return len(name)
 
 table = ExampleTable.open("example.csv")
 print table.group_by("department")
