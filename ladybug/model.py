@@ -148,7 +148,7 @@ class Table(object):
                 other = other_class.getinstance()
                 self.row = row
                 for name in other.static_columns:
-                    value = row[name]
+                    value = row[name] if name in row else ""
                     self.update({name: other.get_field(name)[1](value)})
 
             def copy(self):
@@ -195,13 +195,18 @@ def field(*args, **kwargs):
 
 class StaticField(BaseField):
     """A field that's mapped to a column of a CSV file"""
-    def __init__(self, format=str, column=None):
+    def __init__(self, format=str, column=None, default=None, empty_value=lambda s: s == ""):
         super(StaticField, self).__init__()
         self.format = format
         self.column = column
+        self.default = default
+        self.empty_value = empty_value
 
     def __call__(self, value):
-        return self.format(value)
+        if self.empty_value(value):
+            return self.default
+        else:
+            return self.format(value)
 
 
 class DynamicField(BaseField):

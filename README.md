@@ -14,6 +14,7 @@ class ExampleTable(Table):
     name = Field()
     salary = Field(format=int)
     department = Field()
+    private_office_number = Field(format=int, default=None)
 
     @field
     def name_length(name):
