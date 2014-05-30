@@ -5,12 +5,14 @@ class ExampleTable(Table):
     name = Field()
     salary = Field(format=int)
     department = Field()
+    private_office_number = Field(format=int, default=None)
 
     @field
     def name_length(name):
         return len(name)
 
 table = ExampleTable.open("example.csv")
+print table.group_by("private_office_number", key="name")
 print table.group_by("department")
 print table.group_by("department", key="name")
 print table.group_by("department", key="name", function=lambda g: len(list(g)))

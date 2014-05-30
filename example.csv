@@ -1,4 +1,4 @@
-Bob,2000,IT
-Rob,3000,Sales
-Joe,1500,IT
-Maria,2500,Sales
+Bob,2000,IT,,
+Rob,3000,Sales,,
+Joe,1500,IT,5,
+Maria,2500,Sales,,
